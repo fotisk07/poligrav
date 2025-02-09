@@ -1,29 +1,31 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import os
+from tqdm import tqdm  # progress bar
 
 # ------------------------
-# Parameters
+# Simulation Parameters
 # ------------------------
-d = 50              # Dimension of opinion space
-N_ind = 100         # Number of individuals
-N_party = 0        # Number of major parties
+d = 10          # Dimensionality of the space (increase as desired)
+N_ind = 500     # Number of individuals
+N_party = 2     # Number of major parties
 N_total = N_ind + N_party
 
-steps = 3000        # Number of simulation steps
-dt = 0.005          # Time step (try reducing if things become unstable)
-epsilon = 1e-3      # Softening constant for force magnitude (to avoid singularities)
+steps = 1000    # Number of simulation steps
+dt = 0.005      # Time step for the simulation
+epsilon = 1e-3  # Softening constant for force magnitude (to avoid singularities)
 
-# Mobility factors: 
-# Here we let individuals be more “mobile” and parties move slower.
+# Mobility factors:
+# Individuals are more “mobile” and parties move slower.
 mobility = np.ones(N_total)
-mobility[N_ind:] = 0.1  # parties update 10x slower
+mobility[N_ind:] = 0.1  # Parties update 10x slower
 
-# Masses: individuals are light (mass ~1/N_ind) and parties are heavy (mass 1)
+# Masses: individuals are light (mass ~ 1/N_ind) and parties are heavy (mass 1)
 mass = np.ones(N_total)
 mass[:N_ind] = 1.0 / N_ind
 
 # ------------------------
-# Initialize agent vectors
+# Initialize Agent Vectors
 # ------------------------
 
 # Generate individuals: uniformly random on the unit sphere in R^d.
@@ -37,22 +39,14 @@ Q, _ = np.linalg.qr(rand_matrix)
 basis = Q[:, :2]  # shape (d,2)
 
 # Now generate party vectors in that 2D plane.
-# For example, choose random angles for each party.
 angles = 2 * np.pi * np.random.rand(N_party)
 # Coordinates in 2D for each party:
 party_2d = np.stack([np.cos(angles), np.sin(angles)], axis=1)  # shape (N_party, 2)
 # Embed into R^d:
 parties = party_2d @ basis.T  # shape (N_party, d)
-# (They are already unit because party_2d rows are unit and basis is orthonormal.)
 
 # Combine individuals and parties into one array.
 V = np.vstack([individuals, parties])  # shape (N_total, d)
-
-# ------------------------
-# Prepare for simulation
-# ------------------------
-# To record the evolution of the mean absolute inner product among individuals.
-mean_abs_inner = []
 
 def normalize_rows(X):
     """Normalize each row of X to unit length."""
@@ -60,68 +54,71 @@ def normalize_rows(X):
     return X / norms
 
 # ------------------------
-# Simulation loop
+# Prepare for Simulation
 # ------------------------
-for step in range(steps):
+# To record the evolution of the mean absolute inner product among individuals.
+mean_abs_inner = []
+
+# Use tqdm with a variable so we can update its postfix.
+pbar = tqdm(range(steps), desc="Simulating alignment evolution")
+for step in pbar:
     # Compute pairwise dot products between all agent vectors.
-    # V has shape (N_total, d), so dot_mat[i,j] = v_i dot v_j.
     dot_mat = V @ V.T
-    # Clip dot values to avoid numerical issues.
     dot_mat = np.clip(dot_mat, -1.0, 1.0)
     
     # Compute the angle between each pair: theta_ij = arccos(v_i dot v_j).
     theta = np.arccos(dot_mat)
-    # For i==j, we want to ignore self–interaction.
-    np.fill_diagonal(theta, np.inf)  # so that 1/(inf+epsilon)^2 -> 0
-
-    # Compute the “gravitational” factor f(theta) = 1/(theta+epsilon)^2.
-    # (You can experiment with different exponents.)
-    f = 1.0 / ((theta + epsilon)**2)  # shape (N_total, N_total)
+    # Ignore self–interaction by setting the diagonal to infinity.
+    np.fill_diagonal(theta, np.inf)
     
-    # For the tangent vector T_ij: note that for unit vectors,
-    #   ||v_j - (v_i dot v_j)v_i|| = sqrt(1 - (v_i dot v_j)^2).
-    denom = np.sqrt(1 - dot_mat**2) + 1e-6  # add a small number to avoid division by 0.
+    # Compute the gravitational factor f(theta) = 1/(theta+epsilon)^2.
+    f = 1.0 / ((theta + epsilon) ** 2)
+    f[np.isinf(f)] = 0.0  # Replace any infinite values with zero.
     
-    # We want T_ij = (v_j - (v_i dot v_j) v_i) / ||v_j - (v_i dot v_j)v_i||.
-    # Use broadcasting: for each pair (i,j), subtract (dot_mat[i,j] * V[i]) from V[j].
-    # We'll build a (N_total, N_total, d) array.
-    # Warning: For large N_total and d this may use a lot of memory.
+    # Compute the tangent vectors.
+    denom = np.sqrt(1 - dot_mat**2) + 1e-6  # Avoid division by zero.
+    # For each pair (i, j), compute T_ij = (v_j - (v_i dot v_j)v_i) / ||v_j - (v_i dot v_j)v_i||
     T = V[None, :, :] - (dot_mat[:, :, None] * V[:, None, :])
     T = T / denom[:, :, None]
     
-    # Now compute the net force for each agent.
-    # For each i, sum over j: m_j * f_ij * T_ij.
-    # The masses for j need to be broadcast appropriately.
+    # Compute the net force on each agent.
+    # For each i, sum over j: mass_j * f_ij * T_ij.
     force = (f * mass[None, :])[:, :, None] * T  # shape (N_total, N_total, d)
-    net_force = np.sum(force, axis=1)  # sum over j, shape (N_total, d)
+    net_force = np.sum(force, axis=1)             # shape (N_total, d)
     
-    # Update each vector: move in the tangent space by a small amount.
-    # (Here we use an overdamped dynamics update:
-    #   v_i(new) = normalize( v_i + dt * mobility_i * net_force_i ).)
+    # Update positions using overdamped dynamics and re-normalize.
     V = V + dt * mobility[:, None] * net_force
     V = normalize_rows(V)
     
-    # Optionally record the mean absolute inner product among individuals.
-    V_ind = V[:N_ind]  # only the individuals
+    # Record the mean absolute inner product among individuals.
+    V_ind = V[:N_ind]  # Only the individuals
     inner_ind = V_ind @ V_ind.T
-    # Exclude self–interactions (diagonal) by using the upper triangle.
+    # Use the upper triangle (excluding diagonal) to avoid double-counting.
     iu = np.triu_indices(N_ind, k=1)
     mean_abs = np.mean(np.abs(inner_ind[iu]))
     mean_abs_inner.append(mean_abs)
     
-    # (Optional) Print progress every 100 steps.
-    if step % 100 == 0:
-        print(f"Step {step}: mean |inner product| among individuals = {mean_abs:.3f}")
+    # Update the progress bar's postfix with the current metric.
+    pbar.set_postfix(mean_metric=f"{mean_abs:.3f}")
 
 # ------------------------
-# Plot the evolution
+# Plot the Evolution of the Metric
 # ------------------------
 plt.figure(figsize=(8, 5))
-plt.plot(mean_abs_inner, label="Mean |inner product| (individuals)")
-plt.xlabel("Time step")
-plt.ylabel("Mean |v_i · v_j|")
+plt.plot(mean_abs_inner, marker='o', markersize=2, linestyle='-', color='b')
+plt.xlabel("Simulation Step")
+plt.ylabel("Mean |v_i · v_j| (Individuals)")
 plt.title("Evolution of Opinion Alignment")
-plt.legend()
 plt.grid(True)
-plt.show()
+plt.tight_layout()
 
+# Ensure the results folder exists
+results_dir = "results"
+if not os.path.exists(results_dir):
+    os.makedirs(results_dir)
+
+# Save the figure
+output_path = os.path.join(results_dir, "alignment_evolution.png")
+plt.savefig(output_path)
+print("Saved graph to", output_path)
+plt.show()
