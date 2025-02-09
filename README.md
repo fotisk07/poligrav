@@ -8,6 +8,7 @@ Poligrav is a collection of simple scripts that simulate political models. These
 - **Python** (version 3.6 or later)
 - **numpy**
 - **matplotlib**
+- **tqdm**
 
 That's it! If you have Python installed, you're good to go.
 
@@ -45,7 +46,7 @@ That's it! If you have Python installed, you're good to go.
 4. **Run the Scripts**  
    Poligrav comes with two scripts:
 
-   - **alignment_evolution.py**  
+   - **simple_evolution.py**  
      Simulates opinion evolution in a high-dimensional space and tracks an alignment metric.  
      To run it:
      ```bash
