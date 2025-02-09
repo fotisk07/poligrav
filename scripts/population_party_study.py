@@ -13,6 +13,7 @@ steps = 1000
 dt = 0.005
 d = 50
 epsilon = 1e-3
+drag_coeff = 0.1
 
 results = {}
 
@@ -31,7 +32,7 @@ for N_ind in tqdm(N_ind_list, desc="Population sizes", ncols=80):
             if delta > 0:
                 pbar.update(delta)
         
-        metric_evo = run_simulation(N_ind, N_party, steps, dt, d, epsilon, progress_callback=progress_callback)
+        metric_evo = run_simulation(N_ind, N_party, steps, dt, d, epsilon,drag_coeff,progress_callback=progress_callback)
         pbar.close()
         results[key] = metric_evo
 

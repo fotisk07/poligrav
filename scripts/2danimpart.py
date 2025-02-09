@@ -5,11 +5,12 @@ import matplotlib.animation as animation
 # ------------------------
 # Simulation Parameters
 # ------------------------
-d = 2      # dimensionality of the space
-N = 10     # number of people
+d = 50      # dimensionality of the space
+N = 100     # number of people
 epsilon = 1e-3  # to avoid division by zero
 dt = 0.01
 N_steps = 100   # Total number of simulation steps
+drag_coeff = 0.1 # Drag coefficient
 
 # ------------------------
 # Initialisation

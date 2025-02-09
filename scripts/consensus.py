@@ -30,6 +30,7 @@ N_party = 1
 steps = 500    # Fewer simulation steps for speed
 dt = 0.005
 epsilon = 1e-3
+drag_coeff = 0.1 # Drag coefficient
 
 # Dictionary to hold simulation results for each dimension.
 results = {}
@@ -50,7 +51,7 @@ for d in dimensions:
             pbar.update(delta)
     
     # Run the simulation for the current dimension.
-    metric_evo = run_simulation(N_ind, N_party, steps=steps, dt=dt, d=d, epsilon=epsilon, progress_callback=progress_callback)
+    metric_evo = run_simulation(N_ind, N_party, steps=steps, dt=dt, d=d, epsilon=epsilon, drag_coeff=drag_coeff, progress_callback=progress_callback)
     pbar.close()
     results[d] = metric_evo
 

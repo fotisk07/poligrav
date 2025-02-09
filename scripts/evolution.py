@@ -9,10 +9,11 @@ from simulation import run_simulation  # Assuming __init__.py is in the scripts 
 # ------------------------
 d = 10          # Dimensionality of the space
 N_ind = 100     # Number of individuals
-N_party = 2     # Number of major parties
+N_party = 3     # Number of major parties
 steps = 1000    # Number of simulation steps
 dt = 0.005      # Time step for the simulation
 epsilon = 1e-3  # Softening constant
+drag_coeff = 0.01 # Drag coefficient
 
 # ------------------------
 # Set up a tqdm progress bar
@@ -30,7 +31,7 @@ def progress_callback(fraction):
 # ------------------------
 # Run the Simulation
 # ------------------------
-mean_abs_inner = run_simulation(N_ind, N_party, steps, dt, d, epsilon, progress_callback=progress_callback)
+mean_abs_inner = run_simulation(N_ind, N_party, steps, dt, d, epsilon, drag_coeff, progress_callback=progress_callback)
 pbar.close()
 
 # ------------------------

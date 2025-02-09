@@ -1,6 +1,6 @@
 import numpy as np
 
-def run_simulation(N_ind, N_party, steps=1000, dt=0.005, d=10, epsilon=1e-3, progress_callback=None):
+def run_simulation(N_ind, N_party, steps=1000, dt=0.005, d=10, epsilon=1e-3, drag_coeff=0.1, progress_callback=None):
     """
     Runs the simulation for a given number of individuals and parties.
     Optionally calls progress_callback(fraction) on each iteration.
@@ -48,6 +48,13 @@ def run_simulation(N_ind, N_party, steps=1000, dt=0.005, d=10, epsilon=1e-3, pro
         T = T / denom[:, :, None]
         force = (f * mass[None, :])[:, :, None] * T
         net_force = np.sum(force, axis=1)
+        
+        # ### Add drag
+        norms = np.linalg.norm(net_force, axis=1, keepdims=True)
+        factors = 1.0 / (1.0 + drag_coeff * norms)
+        
+        net_force *= factors
+        
         V = V + dt * mobility[:, None] * net_force
         V = normalize_rows(V)
 
